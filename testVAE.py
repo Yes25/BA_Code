@@ -22,7 +22,7 @@ def to_img(x):
 
 
 # variables:
-num_epochs = 100
+num_epochs = 50
 
 img_transform = transforms.Compose([
     transforms.ToTensor()
