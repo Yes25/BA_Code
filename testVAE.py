@@ -31,7 +31,7 @@ img_transform = transforms.Compose([
 dataset = MNIST(root='../../data', train=True, download=True, transform=img_transform)
 dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
 
-model = VAE(latent_dim=20)
+model = VAE(latent_dim=10)
 if torch.cuda.is_available():
     model.cuda()
 
