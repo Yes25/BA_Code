@@ -12,7 +12,7 @@ def load_all_form_one_digit(digit=8):
 
     for e in dataset:
         if e[1] == digit:
-            list_img_label.append(e[0])
+            list_img_label.append(np.array(e[0]))
 
     return list_img_label
 

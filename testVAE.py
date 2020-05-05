@@ -11,7 +11,7 @@ from torchvision.utils import save_image
 import os
 
 from VAE.vae import *
-
+from data_Mods.shapeMNIST import all_from_one_digit_as_tensor
 from data_Mods.shapeMNIST import load_all_form_one_digit
 
 if not os.path.exists('./vae_img'):
@@ -30,12 +30,19 @@ img_transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-# dataset = MNIST(root='../../data', train=True, download=True, transform=img_transform)
-# dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+#dataset1 = MNIST(root='../../data', train=True, download=True, transform=img_transform)
+#print(type(dataset1))
+#dataset = all_from_one_digit_as_tensor(8)
+#dataset = dataset.unsqueeze(dim=1)
+#print(dataset.shape)
+#dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+
+dataset2 = load_all_form_one_digit(8)
+dataloader = DataLoader(dataset2, batch_size=128, shuffle=True)
 
 
 
-model = VAE(latent_dim=10)
+model = VAE(latent_dim=3)
 if torch.cuda.is_available():
     model.cuda()
 
@@ -46,8 +53,8 @@ for epoch in range(num_epochs):
     train_loss = 0
 
     for batch_idx, data in enumerate(dataloader):
-        img_batch = data[0]
-        img_batch = img_batch.cuda()
+        img_batch = data.unsqueeze(dim=1)
+        img_batch = img_batch.to(device='cuda', dtype=torch.float)
 
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(img_batch)
