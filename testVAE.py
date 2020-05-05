@@ -12,6 +12,8 @@ import os
 
 from VAE.vae import *
 
+from data_Mods.shapeMNIST import load_all_form_one_digit
+
 if not os.path.exists('./vae_img'):
     os.mkdir('./vae_img')
 
@@ -28,8 +30,10 @@ img_transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-dataset = MNIST(root='../../data', train=True, download=True, transform=img_transform)
-dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+# dataset = MNIST(root='../../data', train=True, download=True, transform=img_transform)
+# dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+
+
 
 model = VAE(latent_dim=10)
 if torch.cuda.is_available():

@@ -3,15 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from data_Mods.shapeMNIST import load_all_form_one_digit
-from data_Mods.shapeMNIST import build_mean_shape
+from data_Mods.shapeMNIST import all_from_one_digit_as_tensor
 from data_Mods.displfield import *
 
+###### data shaping testcode ########
+
+img_as_tens = all_from_one_digit_as_tensor(8)
+print(img_as_tens.shape)
+
+
+
+
+###### disp field tests ############
 list_img = load_all_form_one_digit(8)
 print(len(list_img))
-
-
-plt.imshow(list_img[0], 'gray')
-plt.show()
 
 x = displField(28, 28)
 print(x.disp_field.shape)
