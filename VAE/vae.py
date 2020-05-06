@@ -8,7 +8,8 @@ import torch.nn.functional as F
 def loss_function(recon_img, input_img, mu, logvar):
     rec_func = nn.MSELoss(reduction='sum')
     # rec_func = nn.BCELoss(reduction='mean')
-    bce = rec_func(recon_img, input_img)
+    # bce = rec_func(recon_img, input_img)
+    bce = F.binary_cross_entropy(recon_img, input_img);
     kld_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     kld = torch.sum(kld_element).mul_(-0.5)
     return bce + kld

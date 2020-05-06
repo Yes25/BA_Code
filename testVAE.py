@@ -24,7 +24,7 @@ def to_img(x):
 
 
 # variables:
-num_epochs = 50
+num_epochs = 51
 
 img_transform = transforms.Compose([
     transforms.ToTensor()
@@ -38,7 +38,7 @@ img_transform = transforms.Compose([
 #dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
 
 dataset2 = load_all_form_one_digit(8)
-dataloader = DataLoader(dataset2, batch_size=128, shuffle=True)
+dataloader = DataLoader(dataset2, batch_size=256, shuffle=True)
 
 
 
@@ -54,7 +54,7 @@ for epoch in range(num_epochs):
 
     for batch_idx, data in enumerate(dataloader):
         img_batch = data.unsqueeze(dim=1)
-        img_batch = img_batch.to(device='cuda', dtype=torch.float)
+        img_batch = img_batch.float().cuda()
 
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(img_batch)
@@ -64,6 +64,7 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         if batch_idx % 100 == 0:
+            print(img_batch.shape)
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch,
                 batch_idx * len(img_batch),
