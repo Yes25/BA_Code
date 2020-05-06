@@ -54,7 +54,7 @@ for epoch in range(num_epochs):
 
     for batch_idx, data in enumerate(dataloader):
         img_batch = data.unsqueeze(dim=1)
-        img_batch = img_batch.float().cuda()
+        img_batch = img_batch.cuda()
 
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(img_batch)

@@ -5,14 +5,15 @@ from torchvision.datasets import MNIST
 
 
 def load_all_form_one_digit(digit=8):
-    """returns a list of images all with the same given label"""
+    """returns a list of images (as numpy arrays in float32) all with the same given label. Normalizes pixel values to [0,1]"""
     dataset = MNIST(root='../../data', train = True, download=True)
 
     list_img_label = []
 
     for e in dataset:
         if e[1] == digit:
-            list_img_label.append(np.array(e[0]))
+            # conversion and normalization
+            list_img_label.append((np.array(e[0], dtype='float32')/255.0))
 
     return list_img_label
 
