@@ -1,6 +1,6 @@
 import torch
 import torchvision
-from torch import nn
+from torch import nn, Tensor
 from torch import optim
 from torchvision.datasets import MNIST
 import torch.nn.functional as F
@@ -9,6 +9,7 @@ from torchvision import transforms
 from torchvision.utils import save_image
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import os
 
@@ -24,40 +25,68 @@ def to_img(x):
     x = x.view(x.size(0), 1, 28, 28)
     return x
 
-def reconstruct_img(templ_img, displ_field):
 
-    displaced_img = np.ndarray(shape=(len(displ_field), len(templ_img[0]), len(templ_img[1])), dtype=float)
+def reconstruct_img(templ_img, displ_field_fun):
+    # templ_img = torch.Tensor(templ_img).cuda()
+    #
+    # displaced_img = torch.zeros((len(displ_field), 1, len(templ_img[0]), len(templ_img[1]))).cuda()
+    #
+    # for batch in range(0, len(displ_field_fun)):
+    #
+    #     tmp_p_x = displ_field_fun[batch, 0, :, :]
+    #     tmp_p_y = displ_field_fun[batch, 1, :, :]
+    #
+    #     for i in range(0, len(templ_img[0])):
+    #         for j in range(0, len(templ_img[1])):
+    #             if (i + round(tmp_p_x[i, j].item()) < len(templ_img[0])) \
+    #                     and round((j + tmp_p_y[i, j].item()) < len(templ_img[1])):
+    #                 displaced_img[batch, 0, i, j] = templ_img[round(i + tmp_p_x[i, j].item()), round(j + tmp_p_y[i, j].item())]
+    #             else:
+    #                 displaced_img[batch, 0, i, j] = 0.0
+    #
+    # return displaced_img
 
-    for batch in range(0, len(displ_field)):
+    templ_img = torch.Tensor(templ_img).view(-1).cpu()
+    new_idxs = torch.arange(0, 784).unsqueeze(0).unsqueeze(0).expand(len(displ_field_fun), 1, 784).cuda()
+    displaced_img = torch.zeros((len(displ_field), 1, 784)).cpu()
 
-        tmp_p_x = displ_field[batch, 0, :, :]
-        tmp_p_y = displ_field[batch, 1, :, :]
+    tmp_p_x = displ_field_fun[:, 0, :, :].view(-1, 1, 784).cuda()
+    tmp_p_y = displ_field_fun[:, 1, :, :].view(-1, 1, 784).cuda() * 28
 
-        for i in range(0, len(templ_img[0])):
-            for j in range(0, len(templ_img[1])):
-                if (i + round(tmp_p_x[i, j].item()) < len(templ_img[0])) \
-                        and round((j + tmp_p_y[i, j].item()) < len(templ_img[1])):
-                    displaced_img[batch, i, j] = templ_img[round(i + tmp_p_x[i, j].item()), round(j + tmp_p_y[i, j].item())]
-                else:
-                    displaced_img[batch, i, j] = 0.0
+    new_idxs = new_idxs + tmp_p_x + tmp_p_y
+    new_idxs = new_idxs.clamp(0, 783)
+    new_idxs = new_idxs.cpu()
 
-    displaced_img = torch.tensor(displaced_img, dtype=torch.float)
-    displaced_img = displaced_img.unsqueeze(1)
-    # print(displaced_img[63])
+    for img in range(len(displ_field_fun)):
+        for idx in range(0, 784):
+            displaced_img[img, 0, round(new_idxs[img, 0, idx].item())] = templ_img[idx].item()
+
+    mask_tens_0 = torch.zeros_like(displaced_img).cuda()
+    mask_tens_1 = torch.ones_like(displaced_img).cuda()
+
+    displaced_img = displaced_img.cuda()
+
+    # displaced_img = displaced_img.where(displaced_img < 0, mask_tens_0)
+    # displaced_img = displaced_img.where(displaced_img > 1, mask_tens_1)
+
+    displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
+
     return displaced_img
 
 # variables:
-num_epochs = 20
+num_epochs = 150
 
 img_transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
 dataset2 = load_all_form_one_digit(8)
-dataloader = DataLoader(dataset2, batch_size=64, shuffle=True)
+dataloader = DataLoader(dataset2, batch_size=128, shuffle=True)
 
-template = np.array(dataset2[0])
-print(template.shape)
+dataset_templ = load_all_form_one_digit(4)
+
+template = np.array(dataset_templ[0])
+
 
 model = VAE(latent_dim=3)
 if torch.cuda.is_available():
@@ -76,8 +105,6 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         displ_field, mu, logvar = model(img_batch)
         recon_batch = reconstruct_img(template, displ_field)
-        recon_batch = recon_batch.cuda()
-        img_batch = img_batch.cuda()
         loss = loss_function(recon_batch, img_batch, mu, logvar)
         loss.backward()
         train_loss += loss.data.item()
