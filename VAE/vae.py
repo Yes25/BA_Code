@@ -4,23 +4,61 @@ from torch import nn
 from torch import optim
 import torch.nn.functional as F
 
+############## Variables ##############
+kern_sz = 3 # 2
+stride = 1 # 2
+smallest_img_dim = 22 # 3
 
+def reconstruct_img(templ_img, displ_field_fun):
+    img_dim_displ_field = displ_field_fun.size(3)
 
-def loss_function(recon_img, input_img, mu, logvar):
-    rec_func = nn.MSELoss(reduction='sum')
-    bce = F.binary_cross_entropy(recon_img, input_img);
+    templ_img = torch.Tensor(templ_img).view(-1).cpu()
+    new_idxs = torch.arange(0, 784).unsqueeze(0).unsqueeze(0).expand(len(displ_field_fun), 1, 784).cuda()
+    displaced_img = torch.zeros((len(displ_field_fun), 1, 784)).cpu()
+
+    tmp_p_x = displ_field_fun[:, 0, :, :].view(-1, 1, 784).cuda()
+    tmp_p_y = displ_field_fun[:, 1, :, :].view(-1, 1, 784).cuda() * 28
+
+    new_idxs = new_idxs + tmp_p_x + tmp_p_y
+    new_idxs = new_idxs.clamp(0, 783)
+    new_idxs = new_idxs.cpu()
+
+    for img in range(len(displ_field_fun)):
+        for idx in range(0, 784):
+            displaced_img[img, 0, round(new_idxs[img, 0, idx].item())] = templ_img[idx].item()
+
+    displaced_img = displaced_img.cuda()
+
+    # mask_tens_0 = torch.zeros_like(displaced_img).cuda()
+    # mask_tens_1 = torch.ones_like(displaced_img).cuda()
+
+    # displaced_img = displaced_img.where(displaced_img > 0,  mask_tens_0)
+    # displaced_img = displaced_img.where(displaced_img < 1,  mask_tens_1)
+
+    displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
+
+    return displaced_img
+
+def loss_function(recon_img, input_img, disp_field, mu, logvar):
+    rec_func1 = nn.MSELoss(reduction='sum')
+    rec_func2 = nn.MSELoss(reduction='sum')
+
+    in_out_diff = rec_func1(recon_img, input_img)**0.5
     kld_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     kld = torch.sum(kld_element).mul_(-0.5)
-    return bce + kld
+    mask_tens = torch.zeros_like(disp_field)
+    reg_field = rec_func2(disp_field, mask_tens)**0.5
+
+    return in_out_diff + kld + reg_field
 
 
 class VAE(nn.Module):
 
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, template):
         super(VAE, self).__init__()
 
         self.enc = Enoder(latent_dim)
-        self.dec = Decoder(latent_dim)
+        self.dec = Decoder(latent_dim, template)
 
     def reparam(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
@@ -31,8 +69,8 @@ class VAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.enc(x)
         z = self.reparam(mu, logvar)
-        displ_field = self.dec(z)
-        return displ_field, mu, logvar
+        displ_field, recon_img = self.dec(z)
+        return displ_field, recon_img, mu, logvar
 
 
 class Enoder(nn.Module):
@@ -40,12 +78,12 @@ class Enoder(nn.Module):
     def __init__(self, latent_dim):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=3, stride=1, padding=0, bias=True)
-        self.conv2 = nn.Conv2d(4, 8, kernel_size=3, stride=1, padding=0, bias=True)
-        self.conv3 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=0, bias=True)
+        self.conv1 = nn.Conv2d(1, 4, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
+        self.conv2 = nn.Conv2d(4, 8, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
+        self.conv3 = nn.Conv2d(8, 16, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
         # self.conv4 = nn.Conv2d(1, 1, kernel_size=2, stride=2, padding=0, bias=True)
-        self.linear_1 = nn.Linear(22 * 22 * 16, latent_dim)
-        self.linear_2 = nn.Linear(22 * 22 * 16, latent_dim)
+        self.linear_1 = nn.Linear(smallest_img_dim * smallest_img_dim * 16, latent_dim)
+        self.linear_2 = nn.Linear(smallest_img_dim * smallest_img_dim * 16, latent_dim)
 
     def forward(self, x):
         x = F.tanh(self.conv1(x))
@@ -60,19 +98,23 @@ class Enoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, latent_dim,):
+    def __init__(self, latent_dim, template):
         super().__init__()
-        self.linear = nn.Linear(latent_dim, 22 * 22 * 16)
-        self.de_conv1 = nn.ConvTranspose2d(16, 8, kernel_size=3, stride=1, padding=0, bias=True)
-        self.de_conv2 = nn.ConvTranspose2d(8, 4, kernel_size=3, stride=1, padding=0, bias=True)
-        self.de_conv3 = nn.ConvTranspose2d(4, 2, kernel_size=3, stride=1, padding=0, bias=True)
+
+        self.template = template
+
+        self.linear = nn.Linear(latent_dim, smallest_img_dim * smallest_img_dim * 16)
+        self.de_conv1 = nn.ConvTranspose2d(16, 8, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
+        self.de_conv2 = nn.ConvTranspose2d(8, 4, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
+        self.de_conv3 = nn.ConvTranspose2d(4, 2, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
 
     def forward(self, x):
         x = F.tanh(self.linear(x))
-        x = F.tanh(self.de_conv1(x.view(-1, 16, 22, 22)))
+        x = F.tanh(self.de_conv1(x.view(-1, 16, smallest_img_dim, smallest_img_dim)))
         x = F.tanh(self.de_conv2(x))
-        displ_field = self.de_conv3(x)
+        ret_displ_field = self.de_conv3(x)
+        recon_img = reconstruct_img(templ_img=self.template, displ_field_fun=ret_displ_field)
 
-        return displ_field
+        return ret_displ_field, recon_img
 
 
