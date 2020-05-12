@@ -47,7 +47,7 @@ model = VAE(latent_dim=20, template=template_img)
 if torch.cuda.is_available():
     model.cuda()
 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.1)
 
 for epoch in range(num_epochs):
     model.train()
