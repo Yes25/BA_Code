@@ -3,6 +3,7 @@ import torchvision
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 ############## Variables ##############
 kern_sz = 3 # 2
@@ -29,27 +30,28 @@ def reconstruct_img(templ_img, displ_field_fun):
 
     displaced_img = displaced_img.cuda()
 
-    # mask_tens_0 = torch.zeros_like(displaced_img).cuda()
-    # mask_tens_1 = torch.ones_like(displaced_img).cuda()
-
-    # displaced_img = displaced_img.where(displaced_img > 0,  mask_tens_0)
-    # displaced_img = displaced_img.where(displaced_img < 1,  mask_tens_1)
-
     displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
 
     return displaced_img
 
 def loss_function(recon_img, input_img, disp_field, mu, logvar):
-    rec_func1 = nn.MSELoss(reduction='sum')
-    rec_func2 = nn.MSELoss(reduction='sum')
+    rec_func = nn.MSELoss(reduction='sum')
 
-    in_out_diff = rec_func1(recon_img, input_img)**0.5
+    in_out_diff = rec_func(recon_img, input_img)**0.5
+
     kld_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     kld = torch.sum(kld_element).mul_(-0.5)
-    mask_tens = torch.zeros_like(disp_field)
-    reg_field = rec_func2(disp_field, mask_tens)**0.5
 
-    return in_out_diff + kld + reg_field
+    ### Loss of the displacmentfield ###
+    x_vals = (disp_field[:, 0, :, :] ** 2).cuda()
+    y_vals = (disp_field[:, 1, :, :] ** 2).cuda()
+
+    length_vs = ((x_vals + y_vals) ** 0.5).cuda()
+
+    mask_tens = torch.zeros_like(length_vs).cuda()
+    reg_field_loss = (rec_func(length_vs, mask_tens)**0.5).cuda()
+
+    return in_out_diff + kld + reg_field_loss
 
 
 class VAE(nn.Module):
@@ -62,7 +64,7 @@ class VAE(nn.Module):
 
     def reparam(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
-        eps = torch.randn_like(std).cuda()
+        eps = torch.cuda.FloatTensor(std.size()).normal_()
         z = eps * std + mu
         return z
 
@@ -109,9 +111,9 @@ class Decoder(nn.Module):
         self.de_conv3 = nn.ConvTranspose2d(4, 2, kernel_size=kern_sz, stride=stride, padding=0, bias=True)
 
     def forward(self, x):
-        x = F.tanh(self.linear(x))
-        x = F.tanh(self.de_conv1(x.view(-1, 16, smallest_img_dim, smallest_img_dim)))
-        x = F.tanh(self.de_conv2(x))
+        x = torch.tanh(self.linear(x))
+        x = torch.tanh(self.de_conv1(x.view(-1, 16, smallest_img_dim, smallest_img_dim)))
+        x = torch.tanh(self.de_conv2(x))
         ret_displ_field = self.de_conv3(x)
         recon_img = reconstruct_img(templ_img=self.template, displ_field_fun=ret_displ_field)
 

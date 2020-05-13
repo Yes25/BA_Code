@@ -47,7 +47,7 @@ model = VAE(latent_dim=20, template=template_img)
 if torch.cuda.is_available():
     model.cuda()
 
-optimizer = optim.Adam(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 for epoch in range(num_epochs):
     model.train()
@@ -58,10 +58,10 @@ for epoch in range(num_epochs):
         img_batch = img_batch.cuda()
 
         optimizer.zero_grad()
-        displ_field, recon_batch,  mu, logvar = model(img_batch)
-        # recon_batch = reconstruct_img(template, displ_field)
-        loss = loss_function(recon_batch, img_batch, displ_field, mu, logvar)
-        loss = Variable(loss, requires_grad=True)
+        displ_field_run, recon_batch,  mu_run, logvar_run = model(img_batch)
+
+        loss = loss_function(recon_batch, img_batch, displ_field_run, mu_run, logvar_run)
+        # loss = Variable(loss, requires_grad=True)
         loss.backward()
         train_loss += loss.data.item()
         optimizer.step()
