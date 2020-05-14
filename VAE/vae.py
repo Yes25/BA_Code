@@ -14,27 +14,6 @@ smallest_img_dim = 22 # 3
 
 def reconstruct_img(templ_img, displ_field_fun):
 
-    # templ_img = torch.Tensor(templ_img).view(-1).cpu()
-    # new_idxs = torch.arange(0, 784).unsqueeze(0).unsqueeze(0).expand(len(displ_field_fun), 1, 784).cuda()
-    # displaced_img = torch.zeros(len(displ_field_fun), 1, 784).cpu()
-    #
-    # tmp_p_x = displ_field_fun[:, 0, :, :].view(-1, 1, 784).cuda()
-    # tmp_p_y = displ_field_fun[:, 1, :, :].view(-1, 1, 784).cuda() * 28
-    #
-    # new_idxs = new_idxs + tmp_p_x + tmp_p_y
-    # new_idxs = new_idxs.clamp(0, 783)
-    # new_idxs = new_idxs.cpu()
-    #
-    # for img in range(len(displ_field_fun)):
-    #     for idx in range(0, 784):
-    #         displaced_img[img, 0, round(new_idxs[img, 0, idx].item())] = templ_img[idx].item()
-    #
-    # displaced_img = displaced_img.cuda()
-    #
-    # displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
-    #
-    # return Variable(displaced_img, requires_grad=True)
-
     num_imges = len(displ_field_fun)
 
     template_img_batch = torch.Tensor(templ_img).expand(num_imges,28,28).cuda()
