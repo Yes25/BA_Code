@@ -5,39 +5,51 @@ from torch import optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+import matplotlib.pyplot as plt
+
 ############## Variables ##############
 kern_sz = 3 # 2
 stride = 1 # 2
 smallest_img_dim = 22 # 3
 
 def reconstruct_img(templ_img, displ_field_fun):
-    img_dim_displ_field = displ_field_fun.size(3)
 
-    templ_img = torch.Tensor(templ_img).view(-1).cpu()
-    new_idxs = torch.arange(0, 784).unsqueeze(0).unsqueeze(0).expand(len(displ_field_fun), 1, 784).cuda()
-    displaced_img = torch.zeros((len(displ_field_fun), 1, 784)).cpu()
+    # templ_img = torch.Tensor(templ_img).view(-1).cpu()
+    # new_idxs = torch.arange(0, 784).unsqueeze(0).unsqueeze(0).expand(len(displ_field_fun), 1, 784).cuda()
+    # displaced_img = torch.zeros(len(displ_field_fun), 1, 784).cpu()
+    #
+    # tmp_p_x = displ_field_fun[:, 0, :, :].view(-1, 1, 784).cuda()
+    # tmp_p_y = displ_field_fun[:, 1, :, :].view(-1, 1, 784).cuda() * 28
+    #
+    # new_idxs = new_idxs + tmp_p_x + tmp_p_y
+    # new_idxs = new_idxs.clamp(0, 783)
+    # new_idxs = new_idxs.cpu()
+    #
+    # for img in range(len(displ_field_fun)):
+    #     for idx in range(0, 784):
+    #         displaced_img[img, 0, round(new_idxs[img, 0, idx].item())] = templ_img[idx].item()
+    #
+    # displaced_img = displaced_img.cuda()
+    #
+    # displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
+    #
+    # return Variable(displaced_img, requires_grad=True)
 
-    tmp_p_x = displ_field_fun[:, 0, :, :].view(-1, 1, 784).cuda()
-    tmp_p_y = displ_field_fun[:, 1, :, :].view(-1, 1, 784).cuda() * 28
+    num_imges = len(displ_field_fun)
 
-    new_idxs = new_idxs + tmp_p_x + tmp_p_y
-    new_idxs = new_idxs.clamp(0, 783)
-    new_idxs = new_idxs.cpu()
+    template_img_batch = torch.Tensor(templ_img).expand(num_imges,28,28).cuda()
+    template_img_batch = template_img_batch.unsqueeze(1)
 
-    for img in range(len(displ_field_fun)):
-        for idx in range(0, 784):
-            displaced_img[img, 0, round(new_idxs[img, 0, idx].item())] = templ_img[idx].item()
+    rec_img_batch = F.grid_sample(template_img_batch, displ_field_fun,mode='bilinear' ,  padding_mode='zeros')
 
-    displaced_img = displaced_img.cuda()
+    rec_img_batch = rec_img_batch.view(-1, 1, 28, 28)
 
-    displaced_img = displaced_img.view(len(displ_field_fun), 1, 28, 28)
-
-    return displaced_img
+    return rec_img_batch
 
 def loss_function(recon_img, input_img, disp_field, mu, logvar):
     rec_func = nn.MSELoss(reduction='sum')
 
-    in_out_diff = rec_func(recon_img, input_img)**0.5
+    in_out_diff = rec_func(recon_img, input_img)
 
     kld_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     kld = torch.sum(kld_element).mul_(-0.5)
@@ -114,7 +126,8 @@ class Decoder(nn.Module):
         x = torch.tanh(self.linear(x))
         x = torch.tanh(self.de_conv1(x.view(-1, 16, smallest_img_dim, smallest_img_dim)))
         x = torch.tanh(self.de_conv2(x))
-        ret_displ_field = self.de_conv3(x)
+        ret_displ_field = torch.tanh(self.de_conv3(x))
+        ret_displ_field = ret_displ_field.view(-1, 28, 28, 2)
         recon_img = reconstruct_img(templ_img=self.template, displ_field_fun=ret_displ_field)
 
         return ret_displ_field, recon_img

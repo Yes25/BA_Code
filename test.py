@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+import SimpleITK as sitk
+
 from data_Mods.shapeMNIST import load_all_form_one_digit
 from data_Mods.shapeMNIST import all_from_one_digit_as_tensor
 from data_Mods.displfield import *

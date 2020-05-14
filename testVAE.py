@@ -24,7 +24,7 @@ if not os.path.exists('./vae_img'):
 
 def to_img(x):
     x = x.clamp(0, 1)
-    x = x.view(x.size(0), 1, 28, 28)
+    x = x.view(x.size(0),1, 28, 28)
     return x
 
 
@@ -36,14 +36,14 @@ img_transform = transforms.Compose([
 ])
 
 dataset2 = load_all_form_one_digit(8)
-dataloader = DataLoader(dataset2, batch_size=128, shuffle=True)
+dataloader = DataLoader(dataset2, batch_size=256, shuffle=True)
 
-dataset_templ = load_all_form_one_digit(0)
+dataset_templ = load_all_form_one_digit(4)
 
 template_img = np.array(dataset_templ[0])
 
 
-model = VAE(latent_dim=20, template=template_img)
+model = VAE(latent_dim=5, template=template_img)
 if torch.cuda.is_available():
     model.cuda()
 
@@ -60,7 +60,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         displ_field_run, recon_batch,  mu_run, logvar_run = model(img_batch)
 
-        loss = loss_function(recon_batch, img_batch, displ_field_run, mu_run, logvar_run)
+        loss = loss_function(recon_img=recon_batch, input_img=img_batch, disp_field=displ_field_run, mu=mu_run, logvar=logvar_run)
         # loss = Variable(loss, requires_grad=True)
         loss.backward()
         train_loss += loss.data.item()
@@ -75,6 +75,6 @@ for epoch in range(num_epochs):
 
     print('====> Epoch: {} Average loss: {:.4f}'.format(
         epoch, train_loss / len(dataloader.dataset)))
-    if epoch % 2 == 0:
+    if epoch % 10 == 0:
         save = to_img(recon_batch.cpu().data)
         save_image(save, './vae_img/image_{}.png'.format(epoch))
